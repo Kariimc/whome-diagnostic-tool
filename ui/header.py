@@ -40,11 +40,55 @@ class AppHeader:
                 ft.Icon(ft.Icons.SHIELD_OUTLINED, size=18),
                 ft.Text("Safe Mode", size=13),
                 self.safe_switch,
+                ft.Container(width=12),
+                ft.IconButton(ft.Icons.REMOVE, tooltip="Minimize", icon_size=20,
+                              on_click=self._minimize),
+                ft.IconButton(ft.Icons.CLOSE, tooltip="Exit", icon_size=20,
+                              icon_color=ft.Colors.RED_300, on_click=self._exit),
             ],
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
         self.refresh()
+
+    # ------------------------------------------------------------------ #
+    # Window controls                                                    #
+    # ------------------------------------------------------------------ #
+    def _minimize(self, _e) -> None:
+        try:
+            self.page.window.minimized = True
+            self.page.update()
+        except Exception:
+            pass
+
+    def _exit(self, _e) -> None:
+        # If a repair is running, confirm before killing it mid-flight.
+        if self.state.busy:
+            dlg = ft.AlertDialog(
+                modal=True,
+                icon=ft.Icon(ft.Icons.WARNING_AMBER, color=ft.Colors.AMBER),
+                title=ft.Text("A repair is still running"),
+                content=ft.Text("Exiting now stops it partway, which could leave a "
+                                "repair incomplete. Exit anyway?"),
+                actions=[
+                    ft.TextButton("Stay", on_click=lambda _e: self.page.close(dlg)),
+                    ft.FilledButton("Exit anyway",
+                                    on_click=lambda _e: (self.page.close(dlg), self._do_exit())),
+                ],
+                actions_alignment=ft.MainAxisAlignment.END,
+            )
+            self.page.open(dlg)
+        else:
+            self._do_exit()
+
+    def _do_exit(self) -> None:
+        try:
+            self.page.window.close()
+        except Exception:
+            try:
+                self.page.window.destroy()
+            except Exception:
+                pass
 
     # ------------------------------------------------------------------ #
     def _toggle(self, _e) -> None:
