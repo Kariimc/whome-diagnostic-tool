@@ -39,6 +39,10 @@ in-place upgrade — keeping your files and apps. (It's also a card on the
 network blocks it, the app tells you to use the **Open the upgrade page** button
 instead. Plan on 30–90 minutes and a few automatic reboots.
 
+The **Updates** tab also shows a **“This PC: Windows 10 … • Version 1903 • build
+…”** readout (with a refresh button) so you can confirm your build before and
+after an upgrade.
+
 > Prefer to drive it yourself? The **Updates**, **OS Repair** and **Network**
 > tabs expose every tool individually, each with its own Run button.
 
@@ -120,6 +124,7 @@ whome-diagnostic-tool/
 │   ├── tasks.py            # Data-only catalog of repair tools (cmd / multi-step / action)
 │   ├── plans.py            # Symptom -> ordered plan, + free-text classifier
 │   ├── upgrade.py          # Download + launch the Windows 10 Update Assistant
+│   ├── sysinfo.py          # Read the current Windows version from the registry
 │   └── state.py            # Shared state incl. the global dry_run flag
 ├── ui/                     # Flet controls — import core, never the reverse
 │   ├── __init__.py

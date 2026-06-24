@@ -13,6 +13,7 @@ import flet as ft
 
 from core.executor import execute
 from core.state import AppState
+from core.sysinfo import get_windows_version
 from core.tasks import Category, Risk, Task, tasks_for
 from ui.header import AppHeader
 from ui.logger import StatusConsole
@@ -62,6 +63,28 @@ class Dashboard:
         )
         self.cards = ft.Column(spacing=12, scroll=ft.ScrollMode.AUTO, expand=True)
 
+        # "This PC is on …" readout — shown on the Updates tab so you can confirm
+        # the build before and after an upgrade.
+        self.version_text = ft.Text(size=12.5, color=ft.Colors.BLUE_100, selectable=True)
+        self.version_banner = ft.Container(
+            visible=False,
+            padding=ft.padding.symmetric(horizontal=12, vertical=10),
+            border_radius=8,
+            bgcolor=ft.Colors.with_opacity(0.10, ft.Colors.BLUE),
+            content=ft.Row(
+                [
+                    ft.Icon(ft.Icons.COMPUTER, size=18, color=ft.Colors.BLUE_200),
+                    self.version_text,
+                    ft.Container(expand=True),
+                    ft.IconButton(ft.Icons.REFRESH, icon_size=16,
+                                  tooltip="Refresh version",
+                                  on_click=lambda _e: self._refresh_version()),
+                ],
+                spacing=8,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+        )
+
         self.view = ft.Column(
             [
                 ft.Row(
@@ -69,6 +92,7 @@ class Dashboard:
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
                 self.section_sub,
+                self.version_banner,
                 ft.Divider(height=1),
                 self.cards,
             ],
@@ -146,8 +170,17 @@ class Dashboard:
         self.section_title.value = _SECTION_TITLE[self.category]
         self.section_sub.value = _SECTION_SUB[self.category]
         self.cards.controls = [self._task_card(t) for t in tasks_for(self.category)]
+        # Show the Windows version readout on the Updates tab only.
+        self.version_banner.visible = self.category == Category.WINDOWS_UPDATE
+        if self.version_banner.visible:
+            self._refresh_version()
         if self.state.busy:
             self._set_buttons_enabled(False)
+        self.page.update()
+
+    def _refresh_version(self) -> None:
+        info = get_windows_version()
+        self.version_text.value = f"This PC: {info['summary']}"
         self.page.update()
 
     def _set_buttons_enabled(self, enabled: bool) -> None:
