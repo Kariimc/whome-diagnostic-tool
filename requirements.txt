@@ -1,0 +1,4 @@
+# WHome Diagnostic Tool dependencies.
+# Pinned to a verified, stable Flet release (classic control API).
+# Recommended Python: 3.9 - 3.12.
+flet==0.25.2
