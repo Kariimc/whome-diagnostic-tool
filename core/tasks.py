@@ -35,6 +35,10 @@ class Task:
     # When set, the task runs these commands in sequence instead of `command`
     # (used by the multi-step Windows Update reset). Takes precedence.
     steps: list[list[str]] | None = None
+    # When set, the task runs a named Python action (see core.upgrade.ACTIONS)
+    # instead of a command — e.g. download-and-launch the Update Assistant.
+    # Highest precedence. Action tasks are interactive, so "Run all" skips them.
+    action: str | None = None
 
     @property
     def command_str(self) -> str:
@@ -110,6 +114,17 @@ TASKS: list[Task] = [
             ["net", "start", "wuauserv"],
             ["net", "start", "bits"],
         ],
+    ),
+    Task(
+        "wu_upgrade", "⬆ Upgrade to Windows 10 22H2 now",
+        "Downloads Microsoft's official Update Assistant and launches it to "
+        "upgrade this PC in place to the latest version (22H2), keeping your "
+        "files and apps. This is the real fix when you're too far behind for "
+        "Windows Update to catch up on its own (e.g. stuck on 1903). Takes "
+        "30–90 minutes with a few automatic reboots.",
+        category=Category.WINDOWS_UPDATE, risk=Risk.REBOOT,
+        requires_admin=True, est_minutes="30-90 min",
+        action="upgrade_assistant",
     ),
     Task(
         "open_win10_download", "Open the Windows 10 upgrade page",

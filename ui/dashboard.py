@@ -180,7 +180,9 @@ class Dashboard:
             return
         self.state.busy = True
         self._set_buttons_enabled(False)
-        section = tasks_for(self.category)
+        # Skip interactive actions (e.g. launching the Update Assistant) — those
+        # are run deliberately from their own button, not as part of a sweep.
+        section = [t for t in tasks_for(self.category) if not t.action]
         self.console.append(
             f"\n========== Running all {len(section)} tools in "
             f"'{self.category.value}' ==========\n"

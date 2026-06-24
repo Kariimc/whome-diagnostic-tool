@@ -28,6 +28,17 @@ restore point → **clear the corrupted update cache** (stop services → rename
 (DISM) → **repair system files** (SFC) → **re-check for updates** → open the
 official upgrade page. Then reboot and open *Settings ▸ Windows Update*.
 
+#### One-click upgrade for PCs that are too far behind
+
+If your PC is on an out-of-support build (e.g. **1903**), Windows Update often
+can't climb all the way to the current release on its own. When you pick the
+update problem, the plan preview shows an **“Upgrade to 22H2 now”** button that
+**downloads Microsoft's official Update Assistant and launches it** for an
+in-place upgrade — keeping your files and apps. (It's also a card on the
+**Updates** tab.) Downloads via `curl.exe` with a PowerShell fallback; if a
+network blocks it, the app tells you to use the **Open the upgrade page** button
+instead. Plan on 30–90 minutes and a few automatic reboots.
+
 > Prefer to drive it yourself? The **Updates**, **OS Repair** and **Network**
 > tabs expose every tool individually, each with its own Run button.
 
@@ -70,6 +81,7 @@ You need a **Windows PC** (these are Windows-only tools). Get the code onto it
 |---|---|---|
 | **Windows Update** | **Reset Windows Update** | Stops services, clears `SoftwareDistribution` + `catroot2` caches, restarts — the #1 fix for stuck updates |
 | | Repair image / files / re-scan | DISM + SFC + `UsoClient StartScan` to finish the update repair |
+| | **Upgrade to 22H2 now** | Downloads + launches Microsoft's Update Assistant for an in-place upgrade (the fix for out-of-support builds like 1903) |
 | | Restart Update services only | Lighter bounce of `wuauserv` + `bits` for a hung check |
 | **OS Repair** | DISM `/RestoreHealth` | Repairs the Windows image from Windows Update |
 | | SFC `/scannow` | Repairs corrupted protected system files |
@@ -105,8 +117,9 @@ whome-diagnostic-tool/
 │   ├── __init__.py
 │   ├── admin.py            # IsUserAnAdmin() check + UAC self-elevation
 │   ├── executor.py         # asyncio.create_subprocess_exec + live stream piping
-│   ├── tasks.py            # Data-only catalog of repair tools (single + multi-step)
+│   ├── tasks.py            # Data-only catalog of repair tools (cmd / multi-step / action)
 │   ├── plans.py            # Symptom -> ordered plan, + free-text classifier
+│   ├── upgrade.py          # Download + launch the Windows 10 Update Assistant
 │   └── state.py            # Shared state incl. the global dry_run flag
 ├── ui/                     # Flet controls — import core, never the reverse
 │   ├── __init__.py

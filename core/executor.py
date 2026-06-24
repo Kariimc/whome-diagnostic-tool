@@ -198,10 +198,15 @@ async def run_steps(
 async def execute(task, emit: Emit, *, dry_run: bool = True) -> int:
     """Dispatch a Task to the correct runner.
 
-    Multi-step tasks (``task.steps``) run as a sequence; everything else runs as
-    a single command. ``task`` is duck-typed so the executor stays decoupled
-    from the tasks module (it only reads ``.steps``, ``.command`` and ``.label``).
+    Precedence: named Python action -> multi-step sequence -> single command.
+    ``task`` is duck-typed so the executor stays decoupled from the tasks module
+    (it only reads ``.action``, ``.steps``, ``.command`` and ``.label``).
     """
+    action = getattr(task, "action", None)
+    if action:
+        # Lazy import keeps core.upgrade -> core.executor from cycling at load.
+        from core.upgrade import run_action
+        return await run_action(action, emit, dry_run=dry_run)
     steps = getattr(task, "steps", None)
     if steps:
         return await run_steps(steps, emit, dry_run=dry_run, label=task.label)

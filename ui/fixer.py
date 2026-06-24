@@ -14,7 +14,7 @@ import flet as ft
 from core.executor import execute
 from core.plans import PLANS, Plan, classify, get_plan, plan_tasks
 from core.state import AppState
-from core.tasks import Risk
+from core.tasks import Risk, get_task
 from ui.header import AppHeader
 from ui.logger import StatusConsole
 
@@ -173,19 +173,58 @@ class Fixer:
             for note in plan.notes
         ]
 
-        self.plan_box.controls = [
+        controls: list[ft.Control] = [
             ft.Text(plan.title, size=16, weight=ft.FontWeight.BOLD),
             ft.Text(plan.summary, size=13, color=ft.Colors.WHITE70),
             ft.Container(height=4),
             ft.Text(f"What I'll do ({len(tasks)} steps, in order):",
                     size=12, weight=ft.FontWeight.W_600, color=ft.Colors.WHITE60),
             *steps,
-            *( [ft.Container(height=4), *notes] if notes else [] ),
+            *([ft.Container(height=4), *notes] if notes else []),
             ft.Container(height=6),
             ft.Row([self.run_btn], alignment=ft.MainAxisAlignment.END),
         ]
+
+        # For the update problem, also offer the one-click in-place upgrade —
+        # the real fix when a PC is too far behind (e.g. 1903) for WU to recover.
+        if plan.id == "update":
+            controls.append(self._upgrade_panel())
+
+        self.plan_box.controls = controls
         self.run_btn.disabled = False
         self.page.update()
+
+    def _upgrade_panel(self) -> ft.Control:
+        return ft.Container(
+            margin=ft.margin.only(top=8),
+            padding=14,
+            border_radius=10,
+            bgcolor=ft.Colors.with_opacity(0.10, ft.Colors.BLUE),
+            border=ft.border.all(1, ft.Colors.with_opacity(0.30, ft.Colors.BLUE)),
+            content=ft.Row(
+                [
+                    ft.Icon(ft.Icons.ROCKET_LAUNCH, color=ft.Colors.BLUE_200),
+                    ft.Column(
+                        [
+                            ft.Text("Still stuck after the repair?",
+                                    weight=ft.FontWeight.BOLD, size=13),
+                            ft.Text("Upgrade in place to Windows 10 22H2 with "
+                                    "Microsoft's Update Assistant — keeps your "
+                                    "files and apps. Recommended for your version.",
+                                    size=12, color=ft.Colors.WHITE70),
+                        ],
+                        spacing=2, expand=True,
+                    ),
+                    ft.FilledButton(
+                        "Upgrade to 22H2 now",
+                        icon=ft.Icons.SYSTEM_UPDATE,
+                        on_click=lambda _e: self.page.run_task(self._run_upgrade),
+                    ),
+                ],
+                spacing=12,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+        )
 
     # ------------------------------------------------------------------ #
     # Running                                                            #
@@ -197,7 +236,7 @@ class Fixer:
         self.header.lock(not enabled)
         self.page.update()
 
-    async def _confirm_live_run(self, plan: Plan) -> bool:
+    async def _confirm(self, message: str, confirm_label: str = "Yes, do it") -> bool:
         loop = asyncio.get_running_loop()
         fut: asyncio.Future = loop.create_future()
 
@@ -209,15 +248,11 @@ class Fixer:
         dlg = ft.AlertDialog(
             modal=True,
             icon=ft.Icon(ft.Icons.WARNING_AMBER, color=ft.Colors.AMBER),
-            title=ft.Text("Run the fix for real?"),
-            content=ft.Text(
-                f"Safe Mode is OFF, so this will run {len(plan_tasks(plan))} steps "
-                "for real. A System Restore point is created first so you can roll "
-                "back. Continue?"
-            ),
+            title=ft.Text("Run for real?"),
+            content=ft.Text(message),
             actions=[
                 ft.TextButton("Cancel", on_click=lambda _e: resolve(False)),
-                ft.FilledButton("Yes, fix it", on_click=lambda _e: resolve(True)),
+                ft.FilledButton(confirm_label, on_click=lambda _e: resolve(True)),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
@@ -228,8 +263,12 @@ class Fixer:
         plan = self.current_plan
         if plan is None or self.state.busy:
             return
-        if not self.state.dry_run and not await self._confirm_live_run(plan):
-            return
+        if not self.state.dry_run:
+            msg = (f"Safe Mode is OFF, so this will run {len(plan_tasks(plan))} "
+                   "steps for real. A System Restore point is created first so "
+                   "you can roll back. Continue?")
+            if not await self._confirm(msg, "Yes, fix it"):
+                return
 
         self.state.busy = True
         self._set_enabled(False)
@@ -249,6 +288,36 @@ class Fixer:
             if plan.reboot_after:
                 self.console.append(
                     "[!] Please REBOOT your PC to complete these repairs.\n"
+                )
+        finally:
+            self.state.busy = False
+            self.console.set_running(False)
+            self._set_enabled(True)
+
+    async def _run_upgrade(self) -> None:
+        """Download + launch Microsoft's Update Assistant (in-place 22H2 upgrade)."""
+        if self.state.busy:
+            return
+        if not self.state.dry_run:
+            ok = await self._confirm(
+                "This downloads Microsoft's official Update Assistant and starts "
+                "an in-place upgrade to Windows 10 22H2. Your files and apps are "
+                "kept, but it takes 30–90 minutes and reboots a few times. "
+                "Make sure the PC is plugged in. Continue?",
+                confirm_label="Download & upgrade",
+            )
+            if not ok:
+                return
+
+        self.state.busy = True
+        self._set_enabled(False)
+        self.console.set_running(True, "Windows 10 Update Assistant")
+        try:
+            task = get_task("wu_upgrade")
+            rc = await execute(task, self.console.append, dry_run=self.state.dry_run)
+            if rc == 0 and not self.state.dry_run:
+                self.console.append(
+                    ">>> Update Assistant launched — follow its prompts.\n"
                 )
         finally:
             self.state.busy = False
