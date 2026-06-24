@@ -6,11 +6,12 @@ The commands here are the genuinely useful Windows repair tools.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 
 class Category(str, Enum):
+    WINDOWS_UPDATE = "Windows Update"
     OS_REPAIR = "OS Repair"
     NETWORK = "Network & Runtime"
 
@@ -26,20 +27,91 @@ class Task:
     id: str
     label: str
     description: str
-    command: list[str]
-    category: Category
+    command: list[str] = field(default_factory=list)
+    category: Category = Category.OS_REPAIR
     risk: Risk = Risk.READ_ONLY
     requires_admin: bool = True
     est_minutes: str = "1-3 min"
+    # When set, the task runs these commands in sequence instead of `command`
+    # (used by the multi-step Windows Update reset). Takes precedence.
+    steps: list[list[str]] | None = None
 
     @property
     def command_str(self) -> str:
         return " ".join(self.command)
 
+    @property
+    def is_multistep(self) -> bool:
+        return bool(self.steps)
+
 
 # Ordered roughly by "try this first". Commands are passed to
 # create_subprocess_exec as argument lists (no shell), so each token is literal.
 TASKS: list[Task] = [
+    # ------------------------- Windows Update --------------------------
+    # Ordered so "Run all in this section" performs the full, canonical
+    # stuck-update repair: clear cache -> repair image -> repair files -> rescan.
+    Task(
+        "wu_reset", "Reset Windows Update (fix stuck updates)",
+        "The #1 fix for updates that download forever or never install. Stops "
+        "the update services, clears the corrupted SoftwareDistribution and "
+        "catroot2 download caches (renamed to .old as a safe backup), then "
+        "restarts the services so Windows downloads them fresh.",
+        category=Category.WINDOWS_UPDATE, risk=Risk.REPAIR,
+        requires_admin=True, est_minutes="1-2 min",
+        steps=[
+            ["net", "stop", "wuauserv"],
+            ["net", "stop", "bits"],
+            ["net", "stop", "cryptsvc"],
+            ["net", "stop", "msiserver"],
+            ["cmd", "/c", "rd", "/s", "/q", r"%SystemRoot%\SoftwareDistribution.old"],
+            ["cmd", "/c", "rd", "/s", "/q", r"%SystemRoot%\System32\catroot2.old"],
+            ["cmd", "/c", "ren", r"%SystemRoot%\SoftwareDistribution", "SoftwareDistribution.old"],
+            ["cmd", "/c", "ren", r"%SystemRoot%\System32\catroot2", "catroot2.old"],
+            ["net", "start", "wuauserv"],
+            ["net", "start", "bits"],
+            ["net", "start", "cryptsvc"],
+            ["net", "start", "msiserver"],
+        ],
+    ),
+    Task(
+        "wu_dism", "Repair Windows image (DISM)",
+        "Repairs the component store that Windows Update installs into. A "
+        "corrupt store is a common reason updates fail with errors such as "
+        "0x80073712 (DISM /Online /Cleanup-Image /RestoreHealth).",
+        ["DISM", "/Online", "/Cleanup-Image", "/RestoreHealth"],
+        Category.WINDOWS_UPDATE, Risk.REPAIR, True, "10-30 min",
+    ),
+    Task(
+        "wu_sfc", "Repair system files (SFC)",
+        "Repairs protected system files the update process depends on "
+        "(sfc /scannow).",
+        ["sfc", "/scannow"],
+        Category.WINDOWS_UPDATE, Risk.REPAIR, True, "5-15 min",
+    ),
+    Task(
+        "wu_rescan", "Re-check for updates now",
+        "Triggers Windows to scan for updates again (UsoClient StartScan) after "
+        "the repairs. The scan runs in the background — reopen "
+        "Settings ▸ Windows Update to watch it install.",
+        ["UsoClient", "StartScan"],
+        Category.WINDOWS_UPDATE, Risk.REPAIR, True, "<1 min",
+    ),
+    Task(
+        "wu_bounce", "Restart Update services only",
+        "A lighter step that simply stops and restarts the Windows Update and "
+        "BITS services without clearing the cache. Try this first for a hung "
+        "'Checking for updates'.",
+        category=Category.WINDOWS_UPDATE, risk=Risk.REPAIR,
+        requires_admin=True, est_minutes="<1 min",
+        steps=[
+            ["net", "stop", "wuauserv"],
+            ["net", "stop", "bits"],
+            ["net", "start", "wuauserv"],
+            ["net", "start", "bits"],
+        ],
+    ),
+
     # ---------------------------- OS Repair ----------------------------
     Task(
         "dism_restore", "DISM — Repair Windows image",

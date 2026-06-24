@@ -1,11 +1,27 @@
 # WHome Diagnostic Tool
 
 A lightweight, native **Windows** repair utility with a real GUI. It runs the
-genuinely useful built-in Windows repair commands — **SFC**, **DISM**,
-**CHKDSK**, and the network resets — asynchronously, streaming their output live
-so the window never freezes.
+genuinely useful built-in Windows repair commands — the **Windows Update reset**,
+**SFC**, **DISM**, **CHKDSK**, and the network resets — asynchronously, streaming
+their output live so the window never freezes.
 
 Built with [Flet](https://flet.dev) (Flutter-powered desktop UI) and `asyncio`.
+
+### ⭐ Fixing a stuck Windows Update? Start here.
+
+The app opens on the **Updates** tab. If updates download forever, fail, or
+never finish installing:
+
+1. Turn **Safe Mode** off (top-right) so commands run for real.
+2. Click **“Run all in this section.”**
+
+That performs the complete, canonical repair in order:
+**clear the corrupted update cache** (stop services → rename
+`SoftwareDistribution` + `catroot2` → restart services) → **repair the Windows
+image** (DISM) → **repair system files** (SFC) → **re-check for updates**. Then
+reboot and open *Settings ▸ Windows Update* — it will re-download cleanly.
+You can also run any single step on its own (try **Restart Update services
+only** first for a hung “Checking for updates”).
 
 > **Safety first:** the app starts in **Safe Mode (Dry Run)** — commands are
 > *simulated*, nothing on your PC changes. Flip the **Safe Mode** switch off when
@@ -44,6 +60,9 @@ You need a **Windows PC** (these are Windows-only tools). Get the code onto it
 
 | Section | Tool | What it does |
 |---|---|---|
+| **Windows Update** | **Reset Windows Update** | Stops services, clears `SoftwareDistribution` + `catroot2` caches, restarts — the #1 fix for stuck updates |
+| | Repair image / files / re-scan | DISM + SFC + `UsoClient StartScan` to finish the update repair |
+| | Restart Update services only | Lighter bounce of `wuauserv` + `bits` for a hung check |
 | **OS Repair** | DISM `/RestoreHealth` | Repairs the Windows image from Windows Update |
 | | SFC `/scannow` | Repairs corrupted protected system files |
 | | SFC `/verifyonly` | Checks system files **without** changing anything |

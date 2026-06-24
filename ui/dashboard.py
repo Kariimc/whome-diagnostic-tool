@@ -2,21 +2,36 @@
 "Run" button to the asynchronous executor.
 
 The dashboard owns no business logic: it reads the task catalog from
-``core.tasks`` and delegates execution to ``core.executor.run_command``,
-passing the live ``dry_run`` flag and the console's ``append`` as the output
-sink.
+``core.tasks`` and delegates execution to ``core.executor.execute`` (which
+dispatches single-command and multi-step tasks alike), passing the live
+``dry_run`` flag and the console's ``append`` as the output sink.
 """
 from __future__ import annotations
 
 import flet as ft
 
-from core.executor import run_command
+from core.executor import execute
 from core.state import AppState
 from core.tasks import Category, Risk, Task, tasks_for
 from ui.logger import StatusConsole
 
 # Category order must match the NavigationRail destinations in sidebar.py.
-_CATEGORY_BY_INDEX = [Category.OS_REPAIR, Category.NETWORK]
+_CATEGORY_BY_INDEX = [Category.WINDOWS_UPDATE, Category.OS_REPAIR, Category.NETWORK]
+
+_SECTION_TITLE = {
+    Category.WINDOWS_UPDATE: "Windows Update Repair",
+    Category.OS_REPAIR: "Windows OS Repair",
+    Category.NETWORK: "Network & Runtime",
+}
+_SECTION_SUB = {
+    Category.WINDOWS_UPDATE:
+        "Fix updates that won't download or never finish installing. "
+        "Tip: use “Run all in this section” for the full repair sequence.",
+    Category.OS_REPAIR:
+        "Repair corrupted system files and the Windows image.",
+    Category.NETWORK:
+        "Fix connectivity problems and inspect the system.",
+}
 
 _RISK_COLOR = {
     Risk.READ_ONLY: ft.Colors.GREEN_400,
@@ -35,7 +50,7 @@ class Dashboard:
         self.page = page
         self.state = state
         self.console = console
-        self.category = Category.OS_REPAIR
+        self.category = Category.WINDOWS_UPDATE
         self._run_buttons: list[ft.Control] = []
 
         # Safe-mode (dry-run) switch.
@@ -216,15 +231,8 @@ class Dashboard:
 
     def render(self) -> None:
         self._run_buttons = []
-        is_os = self.category == Category.OS_REPAIR
-        self.section_title.value = (
-            "Windows OS Repair" if is_os else "Network & Runtime"
-        )
-        self.section_sub.value = (
-            "Repair corrupted system files and the Windows image."
-            if is_os else
-            "Fix connectivity problems and inspect the system."
-        )
+        self.section_title.value = _SECTION_TITLE[self.category]
+        self.section_sub.value = _SECTION_SUB[self.category]
         self.cards.controls = [self._task_card(t) for t in tasks_for(self.category)]
         self._refresh_admin_chip()
         self._refresh_safe_banner()
@@ -259,11 +267,8 @@ class Dashboard:
         self._set_buttons_enabled(False)
         self.console.set_running(True, task.label)
         try:
-            rc = await run_command(
-                task.command,
-                self.console.append,
-                dry_run=self.state.dry_run,
-                label=task.label,
+            rc = await execute(
+                task, self.console.append, dry_run=self.state.dry_run
             )
             verdict = "SUCCESS" if rc == 0 else f"finished with exit code {rc}"
             self.console.append(f">>> {task.label}: {verdict}\n")
@@ -286,11 +291,8 @@ class Dashboard:
         try:
             for task in section:
                 self.console.set_running(True, task.label)
-                rc = await run_command(
-                    task.command,
-                    self.console.append,
-                    dry_run=self.state.dry_run,
-                    label=task.label,
+                rc = await execute(
+                    task, self.console.append, dry_run=self.state.dry_run
                 )
                 verdict = "SUCCESS" if rc == 0 else f"exit code {rc}"
                 self.console.append(f">>> {task.label}: {verdict}\n")

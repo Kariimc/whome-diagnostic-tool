@@ -21,6 +21,11 @@ def build_sidebar(on_change) -> ft.NavigationRail:
         ),
         destinations=[
             ft.NavigationRailDestination(
+                icon=ft.Icons.SYSTEM_UPDATE_ALT,
+                selected_icon=ft.Icons.SYSTEM_UPDATE,
+                label="Updates",
+            ),
+            ft.NavigationRailDestination(
                 icon=ft.Icons.HEALING_OUTLINED,
                 selected_icon=ft.Icons.HEALING,
                 label="OS Repair",

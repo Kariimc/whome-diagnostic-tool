@@ -21,6 +21,10 @@ from typing import Awaitable, Callable, Union
 # page.update()). Async callbacks are supported too.
 Emit = Callable[[str], Union[None, Awaitable[None]]]
 
+# Suppress the brief console window that child processes (cmd, net, sfc …) would
+# otherwise flash when spawned from a windowed GUI. 0 (no-op) on non-Windows.
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 
 async def _maybe_await(value) -> None:
     """Await *value* if the emit callback returned a coroutine."""
@@ -110,6 +114,7 @@ async def _run_async(command: list[str], emit: Emit) -> int:
         *command,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
+        creationflags=_NO_WINDOW,
     )
     assert proc.stdout is not None
     # Read fixed-size chunks (not lines) so progress that uses carriage
@@ -141,7 +146,7 @@ async def _run_threaded(command: list[str], emit: Emit) -> int:
                 command,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                creationflags=_NO_WINDOW,
             )
             assert proc.stdout is not None
             for raw in iter(lambda: proc.stdout.read(1024), b""):
@@ -161,3 +166,43 @@ async def _run_threaded(command: list[str], emit: Emit) -> int:
         if isinstance(item, tuple) and item and item[0] is _DONE:
             return item[1]
         await _maybe_await(emit(item))
+
+
+async def run_steps(
+    steps: list[list[str]],
+    emit: Emit,
+    *,
+    dry_run: bool = True,
+    label: str = "",
+) -> int:
+    """Run a sequence of commands in order, streaming each one's output.
+
+    Used by multi-step tasks (e.g. the Windows Update reset). Continues through
+    individual failures — a service that is already stopped, or a cache folder
+    that does not exist yet, is expected and must not abort the rest — and
+    returns the last non-zero exit code seen (0 if all succeeded).
+    """
+    if label:
+        await _maybe_await(emit(f"\n=== {label} ===\n"))
+    overall = 0
+    total = len(steps)
+    for index, cmd in enumerate(steps, start=1):
+        await _maybe_await(emit(f"\n--- step {index}/{total} ---\n"))
+        rc = await run_command(list(cmd), emit, dry_run=dry_run, label="")
+        if rc != 0:
+            overall = rc
+    await _maybe_await(emit("\n[sequence finished]\n"))
+    return overall
+
+
+async def execute(task, emit: Emit, *, dry_run: bool = True) -> int:
+    """Dispatch a Task to the correct runner.
+
+    Multi-step tasks (``task.steps``) run as a sequence; everything else runs as
+    a single command. ``task`` is duck-typed so the executor stays decoupled
+    from the tasks module (it only reads ``.steps``, ``.command`` and ``.label``).
+    """
+    steps = getattr(task, "steps", None)
+    if steps:
+        return await run_steps(steps, emit, dry_run=dry_run, label=task.label)
+    return await run_command(task.command, emit, dry_run=dry_run, label=task.label)
