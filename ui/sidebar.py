@@ -1,6 +1,7 @@
-"""Left navigation rail: switch between task categories.
+"""Left navigation rail.
 
-Index 0 -> OS Repair, Index 1 -> Network & Runtime (see ``Dashboard.select_index``).
+Index 0 -> Fix My PC (guided), 1 -> Updates, 2 -> OS Repair, 3 -> Network.
+``main.py`` maps the selected index to either the Fixer or a dashboard category.
 """
 from __future__ import annotations
 
@@ -20,6 +21,11 @@ def build_sidebar(on_change) -> ft.NavigationRail:
             padding=ft.padding.only(top=10, bottom=4),
         ),
         destinations=[
+            ft.NavigationRailDestination(
+                icon=ft.Icons.AUTO_FIX_HIGH,
+                selected_icon=ft.Icons.AUTO_FIX_HIGH,
+                label="Fix My PC",
+            ),
             ft.NavigationRailDestination(
                 icon=ft.Icons.SYSTEM_UPDATE_ALT,
                 selected_icon=ft.Icons.SYSTEM_UPDATE,

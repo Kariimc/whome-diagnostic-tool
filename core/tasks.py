@@ -111,8 +111,31 @@ TASKS: list[Task] = [
             ["net", "start", "bits"],
         ],
     ),
+    Task(
+        "open_win10_download", "Open the Windows 10 upgrade page",
+        "Opens Microsoft's official download page in your browser. If your PC is "
+        "too far behind for Windows Update to catch up on its own, download the "
+        "Update Assistant there to upgrade in place to the latest version — it "
+        "keeps your files and apps.",
+        ["cmd", "/c", "start", "", "https://www.microsoft.com/software-download/windows10"],
+        Category.WINDOWS_UPDATE, Risk.READ_ONLY, False, "<1 min",
+    ),
 
     # ---------------------------- OS Repair ----------------------------
+    Task(
+        "restore_point", "Create a safety restore point",
+        "Turns on System Protection and snapshots the system so you can roll "
+        "back if anything goes wrong. A safe first step before bigger repairs. "
+        "(Windows may skip it if one was already made in the last 24 hours.)",
+        category=Category.OS_REPAIR, risk=Risk.READ_ONLY,
+        requires_admin=True, est_minutes="<1 min",
+        steps=[
+            ["powershell", "-NoProfile", "-Command", "Enable-ComputerRestore -Drive 'C:\\'"],
+            ["powershell", "-NoProfile", "-Command",
+             "Checkpoint-Computer -Description 'WHome Diagnostic Tool' "
+             "-RestorePointType 'MODIFY_SETTINGS'"],
+        ],
+    ),
     Task(
         "dism_restore", "DISM — Repair Windows image",
         "Downloads healthy files from Windows Update and repairs the component "

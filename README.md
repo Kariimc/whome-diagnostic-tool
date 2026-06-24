@@ -1,27 +1,35 @@
 # WHome Diagnostic Tool
 
-A lightweight, native **Windows** repair utility with a real GUI. It runs the
-genuinely useful built-in Windows repair commands — the **Windows Update reset**,
-**SFC**, **DISM**, **CHKDSK**, and the network resets — asynchronously, streaming
-their output live so the window never freezes.
+A lightweight, native **Windows** repair utility with a real GUI. Just **tell it
+what's wrong in plain English** and it builds and runs the right repair plan —
+in the correct order, starting with a safety restore point. Under the hood it
+drives the genuinely useful built-in Windows tools — the **Windows Update
+reset**, **SFC**, **DISM**, **CHKDSK**, restore points, and the network resets —
+asynchronously, streaming their output live so the window never freezes.
 
 Built with [Flet](https://flet.dev) (Flutter-powered desktop UI) and `asyncio`.
 
-### ⭐ Fixing a stuck Windows Update? Start here.
+### ⭐ The guided way: tell it what to fix
 
-The app opens on the **Updates** tab. If updates download forever, fail, or
-never finish installing:
+The app opens on the **Fix My PC** tab:
 
-1. Turn **Safe Mode** off (top-right) so commands run for real.
-2. Click **“Run all in this section.”**
+1. Type the problem in your own words — e.g. *“Windows won't finish updating and
+   I'm stuck on an old version”* — and click **Build my fix plan** (or pick a
+   common problem button).
+2. The app shows **exactly what it will do**, step by step, with risk and time
+   for each.
+3. Turn **Safe Mode** off (top-right) when you're ready, then click
+   **Run the full fix**. It creates a restore point first, then runs every step
+   in order, streaming progress live.
 
-That performs the complete, canonical repair in order:
-**clear the corrupted update cache** (stop services → rename
-`SoftwareDistribution` + `catroot2` → restart services) → **repair the Windows
-image** (DISM) → **repair system files** (SFC) → **re-check for updates**. Then
-reboot and open *Settings ▸ Windows Update* — it will re-download cleanly.
-You can also run any single step on its own (try **Restart Update services
-only** first for a hung “Checking for updates”).
+For the **stuck-update** case it runs the complete, canonical repair:
+restore point → **clear the corrupted update cache** (stop services → rename
+`SoftwareDistribution` + `catroot2` → restart) → **repair the Windows image**
+(DISM) → **repair system files** (SFC) → **re-check for updates** → open the
+official upgrade page. Then reboot and open *Settings ▸ Windows Update*.
+
+> Prefer to drive it yourself? The **Updates**, **OS Repair** and **Network**
+> tabs expose every tool individually, each with its own Run button.
 
 > **Safety first:** the app starts in **Safe Mode (Dry Run)** — commands are
 > *simulated*, nothing on your PC changes. Flip the **Safe Mode** switch off when
@@ -97,12 +105,15 @@ whome-diagnostic-tool/
 │   ├── __init__.py
 │   ├── admin.py            # IsUserAnAdmin() check + UAC self-elevation
 │   ├── executor.py         # asyncio.create_subprocess_exec + live stream piping
-│   ├── tasks.py            # Data-only catalog of repair tools
+│   ├── tasks.py            # Data-only catalog of repair tools (single + multi-step)
+│   ├── plans.py            # Symptom -> ordered plan, + free-text classifier
 │   └── state.py            # Shared state incl. the global dry_run flag
 ├── ui/                     # Flet controls — import core, never the reverse
 │   ├── __init__.py
-│   ├── sidebar.py          # NavigationRail (OS Repair vs Network)
-│   ├── dashboard.py        # Task cards, Run buttons, Safe-Mode toggle
+│   ├── sidebar.py          # NavigationRail (Fix My PC / Updates / OS / Network)
+│   ├── fixer.py            # Guided "describe it, I'll fix it" view
+│   ├── dashboard.py        # Task cards + Run buttons per category
+│   ├── header.py           # Global Safe-Mode switch + admin chip + banner
 │   ├── logger.py           # Read-only streaming TextField console
 │   └── dialogs.py          # Admin / privilege modals
 └── assets/                 # Optional icons, etc.

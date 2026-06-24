@@ -4,7 +4,8 @@
 The dashboard owns no business logic: it reads the task catalog from
 ``core.tasks`` and delegates execution to ``core.executor.execute`` (which
 dispatches single-command and multi-step tasks alike), passing the live
-``dry_run`` flag and the console's ``append`` as the output sink.
+``dry_run`` flag and the console's ``append`` as the output sink. The Safe Mode
+switch and admin chip live in the shared :class:`~ui.header.AppHeader`.
 """
 from __future__ import annotations
 
@@ -13,10 +14,8 @@ import flet as ft
 from core.executor import execute
 from core.state import AppState
 from core.tasks import Category, Risk, Task, tasks_for
+from ui.header import AppHeader
 from ui.logger import StatusConsole
-
-# Category order must match the NavigationRail destinations in sidebar.py.
-_CATEGORY_BY_INDEX = [Category.WINDOWS_UPDATE, Category.OS_REPAIR, Category.NETWORK]
 
 _SECTION_TITLE = {
     Category.WINDOWS_UPDATE: "Windows Update Repair",
@@ -32,7 +31,6 @@ _SECTION_SUB = {
     Category.NETWORK:
         "Fix connectivity problems and inspect the system.",
 }
-
 _RISK_COLOR = {
     Risk.READ_ONLY: ft.Colors.GREEN_400,
     Risk.REPAIR: ft.Colors.AMBER_400,
@@ -46,43 +44,26 @@ _RISK_LABEL = {
 
 
 class Dashboard:
-    def __init__(self, page: ft.Page, state: AppState, console: StatusConsole):
+    def __init__(self, page: ft.Page, state: AppState,
+                 console: StatusConsole, header: AppHeader):
         self.page = page
         self.state = state
         self.console = console
+        self.header = header
         self.category = Category.WINDOWS_UPDATE
         self._run_buttons: list[ft.Control] = []
 
-        # Safe-mode (dry-run) switch.
-        self.dry_switch = ft.Switch(
-            value=state.dry_run,
-            on_change=self._toggle_dry,
-            active_color=ft.Colors.GREEN,
-        )
-
-        # Banner that changes colour with the safe-mode state.
-        self.safe_banner = ft.Container(border_radius=8, padding=12)
-
-        # Admin status chip.
-        self.admin_chip = ft.Container(
-            border_radius=20, padding=ft.padding.symmetric(horizontal=12, vertical=6)
-        )
-
         self.section_title = ft.Text(size=20, weight=ft.FontWeight.BOLD)
         self.section_sub = ft.Text(size=13, color=ft.Colors.WHITE60)
-
         self.run_all_btn = ft.OutlinedButton(
             "Run all in this section",
             icon=ft.Icons.PLAYLIST_PLAY,
             on_click=lambda _e: self.page.run_task(self._run_all),
         )
-
         self.cards = ft.Column(spacing=12, scroll=ft.ScrollMode.AUTO, expand=True)
 
         self.view = ft.Column(
             [
-                self._build_header(),
-                self.safe_banner,
                 ft.Row(
                     [self.section_title, ft.Container(expand=True), self.run_all_btn],
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -94,76 +75,7 @@ class Dashboard:
             expand=True,
             spacing=12,
         )
-
         self.render()
-
-    # ------------------------------------------------------------------ #
-    # Header / banners                                                   #
-    # ------------------------------------------------------------------ #
-    def _build_header(self) -> ft.Control:
-        title = ft.Row(
-            [
-                ft.Icon(ft.Icons.MEDICAL_SERVICES, color=ft.Colors.BLUE_300),
-                ft.Text("WHome Diagnostic Tool", size=22, weight=ft.FontWeight.BOLD),
-                ft.Container(expand=True),
-                self.admin_chip,
-                ft.Container(width=16),
-                ft.Row(
-                    [ft.Icon(ft.Icons.SHIELD_OUTLINED, size=18), ft.Text("Safe Mode"),
-                     self.dry_switch],
-                    spacing=6,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                ),
-            ],
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        )
-        return title
-
-    def _refresh_admin_chip(self) -> None:
-        if self.state.is_admin:
-            self.admin_chip.bgcolor = ft.Colors.with_opacity(0.18, ft.Colors.GREEN)
-            self.admin_chip.content = ft.Row(
-                [ft.Icon(ft.Icons.VERIFIED_USER, size=16, color=ft.Colors.GREEN),
-                 ft.Text("Administrator", size=12, color=ft.Colors.GREEN_200)],
-                spacing=6, tight=True,
-            )
-        else:
-            self.admin_chip.bgcolor = ft.Colors.with_opacity(0.18, ft.Colors.RED)
-            self.admin_chip.content = ft.Row(
-                [ft.Icon(ft.Icons.GPP_MAYBE, size=16, color=ft.Colors.RED_300),
-                 ft.Text("Not elevated", size=12, color=ft.Colors.RED_200)],
-                spacing=6, tight=True,
-            )
-
-    def _refresh_safe_banner(self) -> None:
-        if self.state.dry_run:
-            self.safe_banner.bgcolor = ft.Colors.with_opacity(0.12, ft.Colors.GREEN)
-            self.safe_banner.content = ft.Row(
-                [
-                    ft.Icon(ft.Icons.CHECK_CIRCLE, color=ft.Colors.GREEN),
-                    ft.Text(
-                        "SAFE MODE (Dry Run) is ON — commands are simulated, "
-                        "nothing on your PC changes. Toggle it off to perform "
-                        "real repairs.",
-                        expand=True,
-                    ),
-                ],
-                spacing=10,
-            )
-        else:
-            self.safe_banner.bgcolor = ft.Colors.with_opacity(0.16, ft.Colors.RED)
-            self.safe_banner.content = ft.Row(
-                [
-                    ft.Icon(ft.Icons.WARNING_AMBER, color=ft.Colors.RED_300),
-                    ft.Text(
-                        "LIVE MODE — Safe Mode is OFF. Commands will run for real "
-                        "and can change your system. Proceed with care.",
-                        expand=True,
-                        weight=ft.FontWeight.BOLD,
-                    ),
-                ],
-                spacing=10,
-            )
 
     # ------------------------------------------------------------------ #
     # Task cards                                                         #
@@ -225,8 +137,8 @@ class Dashboard:
     # ------------------------------------------------------------------ #
     # Rendering / navigation                                            #
     # ------------------------------------------------------------------ #
-    def select_index(self, index: int) -> None:
-        self.category = _CATEGORY_BY_INDEX[index % len(_CATEGORY_BY_INDEX)]
+    def show_category(self, category: Category) -> None:
+        self.category = category
         self.render()
 
     def render(self) -> None:
@@ -234,9 +146,6 @@ class Dashboard:
         self.section_title.value = _SECTION_TITLE[self.category]
         self.section_sub.value = _SECTION_SUB[self.category]
         self.cards.controls = [self._task_card(t) for t in tasks_for(self.category)]
-        self._refresh_admin_chip()
-        self._refresh_safe_banner()
-        # Keep buttons disabled if a task is mid-flight (e.g. during Run all).
         if self.state.busy:
             self._set_buttons_enabled(False)
         self.page.update()
@@ -245,31 +154,20 @@ class Dashboard:
         for btn in self._run_buttons:
             btn.disabled = not enabled
         self.run_all_btn.disabled = not enabled
-        self.dry_switch.disabled = not enabled
+        self.header.lock(not enabled)
         self.page.update()
 
     # ------------------------------------------------------------------ #
     # Event handlers                                                     #
     # ------------------------------------------------------------------ #
-    def _toggle_dry(self, _e) -> None:
-        self.state.dry_run = self.dry_switch.value
-        self._refresh_safe_banner()
-        self.console.append(
-            f"\n[Safe Mode {'ON — simulating commands' if self.state.dry_run else 'OFF — REAL commands will run'}]\n"
-        )
-        self.page.update()
-
     async def _run(self, task: Task) -> None:
-        """Execute a single task, streaming output to the console."""
         if self.state.busy:
             return
         self.state.busy = True
         self._set_buttons_enabled(False)
         self.console.set_running(True, task.label)
         try:
-            rc = await execute(
-                task, self.console.append, dry_run=self.state.dry_run
-            )
+            rc = await execute(task, self.console.append, dry_run=self.state.dry_run)
             verdict = "SUCCESS" if rc == 0 else f"finished with exit code {rc}"
             self.console.append(f">>> {task.label}: {verdict}\n")
         finally:
@@ -278,7 +176,6 @@ class Dashboard:
             self._set_buttons_enabled(True)
 
     async def _run_all(self) -> None:
-        """Run every task in the current section, in order."""
         if self.state.busy:
             return
         self.state.busy = True
@@ -291,9 +188,7 @@ class Dashboard:
         try:
             for task in section:
                 self.console.set_running(True, task.label)
-                rc = await execute(
-                    task, self.console.append, dry_run=self.state.dry_run
-                )
+                rc = await execute(task, self.console.append, dry_run=self.state.dry_run)
                 verdict = "SUCCESS" if rc == 0 else f"exit code {rc}"
                 self.console.append(f">>> {task.label}: {verdict}\n")
             self.console.append("\n========== All tools finished ==========\n")
