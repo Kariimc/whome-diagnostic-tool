@@ -215,10 +215,22 @@ class Fixer:
                         ],
                         spacing=2, expand=True,
                     ),
-                    ft.FilledButton(
-                        "Upgrade to 22H2 now",
-                        icon=ft.Icons.SYSTEM_UPDATE,
-                        on_click=lambda _e: self.page.run_task(self._run_upgrade),
+                    ft.Column(
+                        [
+                            ft.FilledButton(
+                                "Upgrade to 22H2 now",
+                                icon=ft.Icons.SYSTEM_UPDATE,
+                                on_click=lambda _e: self.page.run_task(self._run_upgrade),
+                            ),
+                            ft.TextButton(
+                                "Make a 22H2 USB / ISO",
+                                icon=ft.Icons.USB,
+                                on_click=lambda _e: self.page.run_task(self._run_media),
+                            ),
+                        ],
+                        spacing=2,
+                        horizontal_alignment=ft.CrossAxisAlignment.END,
+                        tight=True,
                     ),
                 ],
                 spacing=12,
@@ -294,32 +306,44 @@ class Fixer:
             self.console.set_running(False)
             self._set_enabled(True)
 
-    async def _run_upgrade(self) -> None:
-        """Download + launch Microsoft's Update Assistant (in-place 22H2 upgrade)."""
+    async def _run_action_task(self, task_id: str, running_label: str,
+                               confirm_msg: str, confirm_label: str) -> None:
+        """Run an interactive download-and-launch task (upgrade / media tool)."""
         if self.state.busy:
             return
-        if not self.state.dry_run:
-            ok = await self._confirm(
-                "This downloads Microsoft's official Update Assistant and starts "
-                "an in-place upgrade to Windows 10 22H2. Your files and apps are "
-                "kept, but it takes 30–90 minutes and reboots a few times. "
-                "Make sure the PC is plugged in. Continue?",
-                confirm_label="Download & upgrade",
-            )
-            if not ok:
-                return
+        if not self.state.dry_run and not await self._confirm(confirm_msg, confirm_label):
+            return
 
         self.state.busy = True
         self._set_enabled(False)
-        self.console.set_running(True, "Windows 10 Update Assistant")
+        self.console.set_running(True, running_label)
         try:
-            task = get_task("wu_upgrade")
-            rc = await execute(task, self.console.append, dry_run=self.state.dry_run)
+            rc = await execute(get_task(task_id), self.console.append,
+                               dry_run=self.state.dry_run)
             if rc == 0 and not self.state.dry_run:
-                self.console.append(
-                    ">>> Update Assistant launched — follow its prompts.\n"
-                )
+                self.console.append(f">>> {running_label} launched — follow its prompts.\n")
         finally:
             self.state.busy = False
             self.console.set_running(False)
             self._set_enabled(True)
+
+    async def _run_upgrade(self) -> None:
+        """Download + launch the Update Assistant (in-place 22H2 upgrade)."""
+        await self._run_action_task(
+            "wu_upgrade", "Windows 10 Update Assistant",
+            "This downloads Microsoft's official Update Assistant and starts an "
+            "in-place upgrade to Windows 10 22H2. Your files and apps are kept, "
+            "but it takes 30–90 minutes and reboots a few times. Make sure the PC "
+            "is plugged in. Continue?",
+            "Download & upgrade",
+        )
+
+    async def _run_media(self) -> None:
+        """Download + launch the Media Creation Tool (make a 22H2 USB / ISO)."""
+        await self._run_action_task(
+            "wu_iso", "Media Creation Tool",
+            "This downloads Microsoft's official Media Creation Tool and opens it "
+            "so you can make a 22H2 USB stick or ISO. Have an 8 GB+ USB drive ready "
+            "— the drive you select will be erased. Continue?",
+            "Download tool",
+        )

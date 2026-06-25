@@ -43,6 +43,8 @@ class AppHeader:
                 ft.Container(width=12),
                 ft.IconButton(ft.Icons.REMOVE, tooltip="Minimize", icon_size=20,
                               on_click=self._minimize),
+                ft.IconButton(ft.Icons.CROP_SQUARE, tooltip="Maximize / restore",
+                              icon_size=18, on_click=self._toggle_max),
                 ft.IconButton(ft.Icons.CLOSE, tooltip="Exit", icon_size=20,
                               icon_color=ft.Colors.RED_300, on_click=self._exit),
             ],
@@ -57,6 +59,13 @@ class AppHeader:
     def _minimize(self, _e) -> None:
         try:
             self.page.window.minimized = True
+            self.page.update()
+        except Exception:
+            pass
+
+    def _toggle_max(self, _e) -> None:
+        try:
+            self.page.window.maximized = not self.page.window.maximized
             self.page.update()
         except Exception:
             pass

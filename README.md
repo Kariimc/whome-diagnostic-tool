@@ -39,6 +39,12 @@ in-place upgrade — keeping your files and apps. (It's also a card on the
 network blocks it, the app tells you to use the **Open the upgrade page** button
 instead. Plan on 30–90 minutes and a few automatic reboots.
 
+Need a bootable **USB stick** or an **ISO** instead — to repair a PC that won't
+boot, or do a clean install? Use the **“Make a 22H2 USB / ISO”** button (also a
+card on the **Updates** tab). It downloads and opens Microsoft's official
+**Media Creation Tool**; choose *USB flash drive* and your 8 GB+ stick (it will
+be erased), or *ISO file* to save the image for later.
+
 The **Updates** tab also shows a **“This PC: Windows 10 … • Version 1903 • build
 …”** readout (with a refresh button) so you can confirm your build before and
 after an upgrade.
@@ -86,6 +92,7 @@ You need a **Windows PC** (these are Windows-only tools). Get the code onto it
 | **Windows Update** | **Reset Windows Update** | Stops services, clears `SoftwareDistribution` + `catroot2` caches, restarts — the #1 fix for stuck updates |
 | | Repair image / files / re-scan | DISM + SFC + `UsoClient StartScan` to finish the update repair |
 | | **Upgrade to 22H2 now** | Downloads + launches Microsoft's Update Assistant for an in-place upgrade (the fix for out-of-support builds like 1903) |
+| | **Make a 22H2 USB / ISO** | Downloads + launches the Media Creation Tool to put 22H2 on a thumb drive (8 GB+) or save an ISO |
 | | Restart Update services only | Lighter bounce of `wuauserv` + `bits` for a hung check |
 | **OS Repair** | DISM `/RestoreHealth` | Repairs the Windows image from Windows Update |
 | | SFC `/scannow` | Repairs corrupted protected system files |

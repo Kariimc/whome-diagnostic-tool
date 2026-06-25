@@ -56,8 +56,13 @@ async def main(page: ft.Page) -> None:
     try:
         page.window.width = 1200
         page.window.height = 780
-        page.window.min_width = 980
-        page.window.min_height = 640
+        page.window.min_width = 900
+        page.window.min_height = 600
+        # Make sure the window can be moved, resized and maximized.
+        page.window.resizable = True
+        page.window.maximizable = True
+        page.window.minimizable = True
+        page.window.movable = True
         page.window.center()
     except Exception:
         pass

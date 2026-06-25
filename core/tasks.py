@@ -127,6 +127,16 @@ TASKS: list[Task] = [
         action="upgrade_assistant",
     ),
     Task(
+        "wu_iso", "💾 Create a 22H2 USB drive (or ISO)",
+        "Downloads Microsoft's official Media Creation Tool and opens it so you "
+        "can put Windows 10 22H2 onto a USB thumb drive (8 GB+), or save an ISO "
+        "file. Use the stick to upgrade, repair, or clean-install Windows. Note: "
+        "the USB drive you pick will be erased.",
+        category=Category.WINDOWS_UPDATE, risk=Risk.REPAIR,
+        requires_admin=True, est_minutes="10-30 min",
+        action="media_creation_tool",
+    ),
+    Task(
         "open_win10_download", "Open the Windows 10 upgrade page",
         "Opens Microsoft's official download page in your browser. If your PC is "
         "too far behind for Windows Update to catch up on its own, download the "
