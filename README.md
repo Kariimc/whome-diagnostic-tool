@@ -54,7 +54,6 @@ after an upgrade.
 
 > **Safety first:** the app starts in **Safe Mode (Dry Run)** — commands are
 > *simulated*, nothing on your PC changes. Flip the **Safe Mode** switch off when
-> you're ready to perform real repairs.
 
 ---
 
